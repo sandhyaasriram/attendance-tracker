@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Attendance Tracker</title>
+    <style>
+      /* Import a modern font */
+      @import url("https://fonts.googleapis.com/css2?family=Roboto+Serif:wght@300;400;700&display=swap");
+
+      body {
+        font-family: "Roboto Serif", serif;
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+        min-height: 100vh;
+        color: #333;
+        margin: 0;
+        padding: 0;
+      }
+
+      h1,
+      h2 {
+        text-align: center;
+        color: #fff;
+        margin-top: 20px;
+        text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.4);
+      }
+
+      .form-container {
+        width: 60%;
+        margin: 30px auto;
+        background: #fafafa;
+        padding: 40px;
+        border-radius: 12px;
+        border: 2px solid #2a5298;
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
+      }
+
+      .form-container label {
+        display: block;
+        margin-bottom: 6px;
+        font-weight: 600;
+        color: #2a5298;
+      }
+      .form-container input,
+      .form-container select {
+        width: 100%;
+        padding: 14px 14px;
+        margin-bottom: 20px;
+        border: 2px solid #ccc;
+        border-radius: 8px;
+        font-size: 16px;
+        box-sizing: border-box;
+        transition: border-color 0.3s;
+      }
+      .form-container input:focus,
+      .form-container select:focus {
+        border-color: #1e3c72;
+        outline: none;
+      }
+
+      button {
+        background: linear-gradient(135deg, #1e3c72, #2a5298);
+        font-family: "Roboto Serif", serif;
+        color: #fff;
+        padding: 14px 0;
+        border: none;
+        border-radius: 8px;
+        width: 100%;
+        font-size: 18px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: opacity 0.2s;
+      }
+      button:hover {
+        opacity: 0.9;
+      }
+
+      table {
+        width: 85%;
+        margin: 40px auto;
+        border-collapse: collapse;
+        background: #fafafa;
+        border: 2px solid #2a5298;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
+      }
+      thead {
+        background: #2a5298;
+        color: #fff;
+      }
+      th,
+      td {
+        padding: 16px;
+        text-align: center;
+        border: 1px solid #2a5298;
+        font-size: 15px;
+      }
+      tbody tr:nth-child(odd) {
+        background: #f0f4ff;
+      }
+      tbody tr:hover {
+        background: #d0dafb;
+      }
+
+      ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+      }
+      li {
+        padding: 6px 0;
+        font-size: 14px;
+      }
+
+      .alert {
+        color: #e74c3c;
+        font-size: 16px;
+        font-weight: 600;
+        text-align: center;
+        margin-top: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>ATTENDANCE TRACKER</h1>
+
+    <div class="form-container">
+      <form method="POST">
+        <label for="name">Student Name:</label>
+        <input
+          type="text"
+          id="name"
+          name="name"
+          required
+          minlength="3"
+          pattern="[A-Za-z\s]+$"
+          title="Only letters and spaces are allowed and minimum 3 characters"
+        />
+
+        <label for="student_id">Student ID:</label>
+        <input
+          type="text"
+          id="student_id"
+          name="student_id"
+          required
+          pattern="[A-Za-z0-9]+$"
+          title="Only letters and numbers are allowed"
+        />
+
+        <label for="gpa">GPA:</label>
+        <input
+          type="number"
+          id="gpa"
+          name="gpa"
+          step="0.1"
+          min="0"
+          max="10"
+          required
+        />
+
+        <label for="num_courses">Number of Courses:</label>
+        <input
+          type="number"
+          id="num_courses"
+          name="num_courses"
+          min="1"
+          max="15"
+          required
+        />
+
+        <div id="courses-container"></div>
+
+        <button type="submit">Submit</button>
+      </form>
+    </div>
+
+    {% if has_students %}
+    <h2>Student Attendance Summary</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Registration Number</th>
+          <th>Student Name</th>
+          <th>GPA</th>
+          <th>Overall Attendance</th>
+          <th>Courses</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for student in students.values() %}
+        <tr>
+          <td>{{ student.student_id }}</td>
+          <td>{{ student.name }}</td>
+          <td>{{ student.gpa }}</td>
+          <td>
+            {% if student.overall_attendance is not none %}
+            <span
+              style="font-weight: bold; color: 
+                              {% if student.gpa >= 9 %}
+                                  {% if student.overall_attendance < 35 %} red 
+                                  {% elif student.overall_attendance < 40 %} orange 
+                                  {% else %} green 
+                                  {% endif %}
+                              {% else %}
+                                  {% if student.overall_attendance < 75 %} red 
+                                  {% elif student.overall_attendance < 80 %} orange 
+                                  {% else %} green 
+                                  {% endif %}
+                              {% endif %};"
+            >
+              {{ student.overall_attendance | round(2) }}%
+            </span>
+            {% else %} N/A {% endif %}
+          </td>
+          <td>
+            <ul>
+              {% for course in student.courses %}
+              <li
+                style="color: 
+                                  {% if student.gpa >= 9 %}
+                                      {% if course.attendance_percentage < 35 %} red 
+                                      {% elif course.attendance_percentage < 40 %} orange 
+                                      {% else %} green 
+                                      {% endif %}
+                                  {% else %}
+                                      {% if course.attendance_percentage < 75 %} red 
+                                      {% elif course.attendance_percentage < 80 %} orange 
+                                      {% else %} green 
+                                      {% endif %}
+                                  {% endif %};"
+              >
+                {{ course.course }} - {{ course.attendance_percentage | round(2)
+                }}%
+              </li>
+              {% endfor %}
+            </ul>
+          </td>
+          <td>
+            <a href="{{ url_for('delete_backend', student_id=student.student_id) }}">Delete</a> |
+            <a href="{{ url_for('edit_page', student_id=student.student_id) }}">Edit</a>
+
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+
+    <script>
+      document
+        .getElementById("num_courses")
+        .addEventListener("input", function () {
+          const numCourses = parseInt(this.value);
+          const container = document.getElementById("courses-container");
+          container.innerHTML = "";
+
+          for (let i = 1; i <= numCourses; i++) {
+            container.innerHTML += `
+                    <h3>Course ${i}</h3>
+                    <label for="course_${i}">Course Name:</label>
+                    <input type="text" id="course_${i}" name="course_${i}" required pattern="^[A-Za-z ]{3,}$" title="Only letters and spaces allowed (min 3 chars)">
+
+                    <label for="total_classes_${i}">Total Classes:</label>
+                    <input type="number" id="total_classes_${i}" name="total_classes_${i}" min="1" required>
+
+                    <label for="attended_classes_${i}">Attended Classes:</label>
+                    <input type="number" id="attended_classes_${i}" name="attended_classes_${i}" min="0" required>
+                `;
+          }
+
+          for (let i = 1; i <= numCourses; i++) {
+            const totalInput = document.getElementById(`total_classes_${i}`);
+            const attendedInput = document.getElementById(
+              `attended_classes_${i}`
+            );
+
+            const validateAttendance = () => {
+              const total = parseInt(totalInput.value);
+              const attended = parseInt(attendedInput.value);
+
+              if (!isNaN(total) && !isNaN(attended)) {
+                if (attended > total) {
+                  attendedInput.setCustomValidity(
+                    "Attended classes cannot exceed total classes."
+                  );
+                } else {
+                  attendedInput.setCustomValidity("");
+                }
+              } else {
+                attendedInput.setCustomValidity("");
+              }
+            };
+
+            totalInput.addEventListener("input", validateAttendance);
+            attendedInput.addEventListener("input", validateAttendance);
+          }
+        });
+
+      document
+        .querySelector("form")
+        .addEventListener("submit", function (event) {
+          const numCourses = parseInt(
+            document.getElementById("num_courses").value
+          );
+
+          for (let i = 1; i <= numCourses; i++) {
+            const totalInput = document.getElementById(`total_classes_${i}`);
+            const attendedInput = document.getElementById(
+              `attended_classes_${i}`
+            );
+
+            if (!totalInput || !attendedInput) continue;
+
+            const total = parseInt(totalInput.value);
+            const attended = parseInt(attendedInput.value);
+
+            // Clear any previous error
+            attendedInput.setCustomValidity("");
+
+            if (attended > total) {
+              attendedInput.setCustomValidity(
+                "Attended classes cannot exceed total classes."
+              );
+              attendedInput.reportValidity();
+              event.preventDefault();
+              return;
+            }
+          }
+        });
+    </script>
+  </body>
+</html>
