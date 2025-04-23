@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect
+from flask import Flask, render_template, request, redirect, jsonify
 from pymongo import MongoClient
 
 app = Flask(__name__)
@@ -150,6 +150,38 @@ def edit(student_id):
     )
 
     return redirect('/')
+
+@app.route('/calculate_skips/<student_id>/<goal>')
+def calculate_skips(student_id, goal):
+    student = students_collection.find_one({'student_id': student_id})
+    if not student:
+        return jsonify({'error': 'Student not found'}), 404
+
+    gpa = student['gpa']
+    courses = student['courses']
+    total_attended = sum(c['attended_classes'] for c in courses)
+    total_classes = sum(c['total_classes'] for c in courses)
+
+    target_overall = 0.75 if goal == '75' else 0.85
+    target_individual = 0.75 if gpa < 9 else (0.35 if goal == '75' else 0.75)
+
+    result = []
+    for course in courses:
+        attended = course['attended_classes']
+        total = course['total_classes']
+        # Maximum allowed total classes for the target
+        max_classes = int(attended / target_individual)
+        max_overall_classes = int(total_attended / target_overall)
+
+        max_allowed = min(max_classes - total, max_overall_classes - total_classes)
+        max_allowed = max(0, max_allowed)
+
+        result.append({
+            'course': course['course'],
+            'can_skip': max_allowed
+        })
+
+    return jsonify(result)
     
 if __name__ == '__main__':
     app.run(debug=True)

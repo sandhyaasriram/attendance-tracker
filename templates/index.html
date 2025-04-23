@@ -239,8 +239,8 @@
           </td>
           <td>
             <a href="{{ url_for('delete_backend', student_id=student.student_id) }}">Delete</a> |
-            <a href="{{ url_for('edit_page', student_id=student.student_id) }}">Edit</a>
-
+            <a href="{{ url_for('edit_page', student_id=student.student_id) }}">Edit</a> |
+            <a href="javascript:void(0);" onclick="showSkipPopup('{{ student.student_id }}')">Num of classes you can skip</a>
           </td>
         </tr>
         {% endfor %}
@@ -248,6 +248,14 @@
     </table>
     {% endif %}
 
+    <div id="skipPopup" style="display:none; position:fixed; top:10%; left:50%; transform:translateX(-50%); background:#fff; padding:20px; border:2px solid #2a5298; border-radius:10px; z-index:9999; box-shadow:0 0 10px rgba(0,0,0,0.3); width: 400px;">
+      <h3 style="margin-top:0;">Choose your goal</h3>
+      <button id="skip75">Don't get debarred (75%)</button>
+      <button id="skip85" style="margin-top: 2px">Maintain 85% Overall</button>
+      <div id="skipResult" style="margin-top: 20px;"></div>
+      <button onclick="document.getElementById('skipPopup').style.display='none';" style="margin-top: 10px;">Close</button>
+    </div>
+  
     <script>
       document
         .getElementById("num_courses")
@@ -329,6 +337,32 @@
             }
           }
         });
+
+        function showSkipPopup(studentId) {
+          document.getElementById('skipResult').innerHTML = '';
+          document.getElementById('skipPopup').style.display = 'block';
+      
+          document.getElementById('skip75').onclick = () => fetchSkips(studentId, '75');
+          document.getElementById('skip85').onclick = () => fetchSkips(studentId, '85');
+      }
+      
+      function fetchSkips(studentId, goal) {
+          fetch(`/calculate_skips/${studentId}/${goal}`)
+              .then(res => res.json())
+              .then(data => {
+                  if (data.error) {
+                      document.getElementById('skipResult').innerHTML = `<p style="color:red">${data.error}</p>`;
+                      return;
+                  }
+                  let html = '<ul>';
+                  data.forEach(c => {
+                      html += `<li>${c.course}: <strong>${c.can_skip}</strong> classes can be skipped</li>`;
+                  });
+                  html += '</ul>';
+                  document.getElementById('skipResult').innerHTML = html;
+              });
+      }
+      
     </script>
   </body>
 </html>
