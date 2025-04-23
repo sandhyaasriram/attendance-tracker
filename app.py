@@ -103,7 +103,7 @@ def delete_backend(student_id):
         return redirect('/') 
     else:
         return f"No student found with student_id {student_id}.", 404
-    
+
 @app.route('/edit/<student_id>', methods=['GET'])
 def edit_page(student_id):
     student = students_collection.find_one({'student_id': student_id})
@@ -157,31 +157,67 @@ def calculate_skips(student_id, goal):
     if not student:
         return jsonify({'error': 'Student not found'}), 404
 
-    gpa = student['gpa']
     courses = student['courses']
-    total_attended = sum(c['attended_classes'] for c in courses)
-    total_classes = sum(c['total_classes'] for c in courses)
-
-    target_overall = 0.75 if goal == '75' else 0.85
-    target_individual = 0.75 if gpa < 9 else (0.35 if goal == '75' else 0.75)
-
-    result = []
-    for course in courses:
-        attended = course['attended_classes']
-        total = course['total_classes']
-        # Maximum allowed total classes for the target
-        max_classes = int(attended / target_individual)
-        max_overall_classes = int(total_attended / target_overall)
-
-        max_allowed = min(max_classes - total, max_overall_classes - total_classes)
-        max_allowed = max(0, max_allowed)
-
-        result.append({
-            'course': course['course'],
-            'can_skip': max_allowed
-        })
-
-    return jsonify(result)
     
+    # For "don't debar" - calculate per-course skips to maintain 75% in each course
+    if goal == '75':
+        result = []
+        for course in courses:
+            attended = course['attended_classes']
+            total = course['total_classes']
+            
+            # Calculate max classes that can be skipped while maintaining 75% in this course
+            # Formula: attended / (total + skip) >= 0.75
+            # Solving for skip: skip <= (attended / 0.75) - total
+            max_skips = int((attended / 0.75) - total)
+            if max_skips < 0:
+                max_skips = 0
+                
+            result.append({
+                'course': course['course'],
+                'can_skip': max_skips
+            })
+        
+        return jsonify(result)
+    
+    # For "maintain 85%" - calculate total classes that can be skipped while maintaining 85% overall
+    elif goal == '85':
+        total_attended = sum(c['attended_classes'] for c in courses)
+        total_classes = sum(c['total_classes'] for c in courses)
+        
+        # Calculate max total classes that can be skipped while maintaining 85% overall
+        # Formula: total_attended / (total_classes + total_skip) >= 0.85
+        # Solving for total_skip: total_skip <= (total_attended / 0.85) - total_classes
+        total_skippable = int((total_attended / 0.85) - total_classes)
+        if total_skippable < 0:
+            total_skippable = 0
+        
+        # Distribute the skippable classes proportionally among courses
+        result = []
+        for course in courses:
+            # Allocate skips proportionally based on course size
+            course_weight = course['total_classes'] / total_classes
+            course_skips = int(total_skippable * course_weight)
+            
+            # Ensure we don't go below 75% for any individual course
+            attended = course['attended_classes']
+            total = course['total_classes']
+            max_individual_skips = int((attended / 0.75) - total)
+            if max_individual_skips < 0:
+                max_individual_skips = 0
+            
+            # Take the minimum to ensure we don't violate the 75% individual course rule
+            course_skips = min(course_skips, max_individual_skips)
+            
+            result.append({
+                'course': course['course'],
+                'can_skip': course_skips
+            })
+        
+        return jsonify(result)
+    
+    else:
+        return jsonify({'error': 'Invalid goal'}), 400
+
 if __name__ == '__main__':
     app.run(debug=True)
