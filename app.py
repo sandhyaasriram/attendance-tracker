@@ -157,67 +157,70 @@ def calculate_skips(student_id, goal):
     if not student:
         return jsonify({'error': 'Student not found'}), 404
 
+    gpa     = student['gpa']
     courses = student['courses']
-    
-    # For "don't debar" - calculate per-course skips to maintain 75% in each course
+    # original totals
+    total_attended = sum(c['attended_classes'] for c in courses)
+    total_classes  = sum(c['total_classes']  for c in courses)
+
+    # set targets
+    overall_target = 0.75 if goal == '75' else 0.85
     if goal == '75':
-        result = []
-        for course in courses:
-            attended = course['attended_classes']
-            total = course['total_classes']
-            
-            # Calculate max classes that can be skipped while maintaining 75% in this course
-            # Formula: attended / (total + skip) >= 0.75
-            # Solving for skip: skip <= (attended / 0.75) - total
-            max_skips = int((attended / 0.75) - total)
-            if max_skips < 0:
-                max_skips = 0
-                
-            result.append({
-                'course': course['course'],
-                'can_skip': max_skips
-            })
-        
-        return jsonify(result)
-    
-    # For "maintain 85%" - calculate total classes that can be skipped while maintaining 85% overall
-    elif goal == '85':
-        total_attended = sum(c['attended_classes'] for c in courses)
-        total_classes = sum(c['total_classes'] for c in courses)
-        
-        # Calculate max total classes that can be skipped while maintaining 85% overall
-        # Formula: total_attended / (total_classes + total_skip) >= 0.85
-        # Solving for total_skip: total_skip <= (total_attended / 0.85) - total_classes
-        total_skippable = int((total_attended / 0.85) - total_classes)
-        if total_skippable < 0:
-            total_skippable = 0
-        
-        # Distribute the skippable classes proportionally among courses
-        result = []
-        for course in courses:
-            # Allocate skips proportionally based on course size
-            course_weight = course['total_classes'] / total_classes
-            course_skips = int(total_skippable * course_weight)
-            
-            # Ensure we don't go below 75% for any individual course
-            attended = course['attended_classes']
-            total = course['total_classes']
-            max_individual_skips = int((attended / 0.75) - total)
-            if max_individual_skips < 0:
-                max_individual_skips = 0
-            
-            # Take the minimum to ensure we don't violate the 75% individual course rule
-            course_skips = min(course_skips, max_individual_skips)
-            
-            result.append({
-                'course': course['course'],
-                'can_skip': course_skips
-            })
-        
-        return jsonify(result)
-    
+        individual_target = 0.75 if gpa < 9 else 0.35
     else:
-        return jsonify({'error': 'Invalid goal'}), 400
+        individual_target = 0.75
+
+    # prepare round-robin skipping
+    skips = {c['course']: 0 for c in courses}
+    active = [c['course'] for c in courses]
+
+    # map course-name → its original counts
+    orig = {c['course']: (c['attended_classes'], c['total_classes']) for c in courses}
+
+    # keep looping until none can be bumped
+    while active:
+        removed = []
+        for name in active:
+            att, tot = orig[name]
+            # propose one more skip for this course
+            proposed = skips[name] + 1
+            # build new totals for this course
+            new_course_total = tot + proposed
+            # overall totals if we applied all current skips + this one
+            total_skipped = sum(skips.values()) + 1
+            new_overall_total   = total_classes + total_skipped
+            new_overall_attend  = total_attended
+
+            # compute percentages
+            pct_course  = att / new_course_total
+            pct_overall = new_overall_attend / new_overall_total
+
+            # if both constraints still hold, commit the skip
+            if pct_course >= individual_target and pct_overall >= overall_target:
+                skips[name] = proposed
+            else:
+                # otherwise retire this course from further skipping
+                removed.append(name)
+
+        for name in removed:
+            active.remove(name)
+
+    # format result
+    display = []
+    for course in courses:
+        name = course['course']
+        sessions = skips[name]
+        # if it’s a lab, two class‐sessions = one lab session
+        if 'LAB' in name.upper():
+            units = sessions // 2
+        else:
+            units = sessions
+        display.append({
+            'course':   name,
+            'can_skip': units
+        })
+
+    return jsonify(display)
 
 if __name__ == '__main__':
     app.run(debug=True)

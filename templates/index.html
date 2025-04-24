@@ -324,7 +324,6 @@
             const total = parseInt(totalInput.value);
             const attended = parseInt(attendedInput.value);
 
-            // Clear any previous error
             attendedInput.setCustomValidity("");
 
             if (attended > total) {
@@ -355,9 +354,13 @@
                       return;
                   }
                   let html = '<ul>';
-                  data.forEach(c => {
-                      html += `<li>${c.course}: <strong>${c.can_skip}</strong> classes can be skipped</li>`;
-                  });
+                    data.forEach(c => {
+                      const unitLabel = c.course.toUpperCase().includes('LAB') 
+                          ? 'labs' 
+                          : 'classes';
+                  
+                      html += `<li>${c.course}: <strong>${c.can_skip}</strong> ${unitLabel} can be skipped</li>`;
+                  });                  
                   html += '</ul>';
                   document.getElementById('skipResult').innerHTML = html;
               });
